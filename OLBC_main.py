@@ -27,7 +27,8 @@ from sympy import Symbol
 
 #New module to import a bicycle model
 from bicycle_models import generate_model
-from utils import animate_solution, butter_bandpass_filter, butter_lowpass_filter
+from utils import animate_solution, butter_bandpass_filter, butter_lowpass_filter, RMSE
+from scipy.interpolate import CubicSpline
 
 
 
@@ -70,32 +71,11 @@ def sol_dict(prob, free, str_as_keys=False):
     return d
 
 
-def RMSE(x, x_meas):
-    """
-    Computes RMSE to assess optimization performance
-
-    Parameters
-    ----------
-    x : numpy array
-        ground truth.
-    x_meas : numpy array
-        signal.
-
-    Returns
-    -------
-    RMSE
-
-    """
-
-    res = np.mean((x_meas - x)**2)
-    res = np.sqrt(res)
-
-    return(res)
 
 
 
 
-class OLDC_model():
+class OLBC_model():
 
     #Open Loop Direct Collocation Solver
 
@@ -151,8 +131,8 @@ class OLDC_model():
         
         
         # not use this line for general use
-        ti = config['ti']
-        tf = config['tf']
+        ti = self.config['ti']
+        tf = self.config['tf']
         df_trial = self.df_exp[(self.df_exp['time']>ti) & (self.df_exp['time']<tf)]
         time = df_trial['time'].to_numpy()[::self.N_sampling]
         
@@ -435,21 +415,27 @@ class OLDC_model():
 
 
 
-class OLDC_solver():
+class OLBC_solver():
 
     #Open Loop Direct Collocation Solver
 
     def __init__(self, model, scaling_factor, x0=None, config=None):
             
         K_angles = 10*2*8*2
-        K_angle_rates = 10*2*8*2
+        K_angle_rates = 10*2*8*10
         K_effort = 0.1
-        K_regu = 0.1
+        K_regu = 0.05
+        K_speed = 200*30
+
         
         if config != None:
+           
+           K_angles = config['K_angles'] 
+           K_angle_rates = config['K_angle_rates'] 
            K_effort = config['K_effort'] 
+           K_regu = config['K_regu'] 
+           K_speed = config['K_speed']
         
-        K_speed = 200*6
             
         NUM_NODES = model.NUM_NODES
         self.NUM_NODES = NUM_NODES
@@ -530,7 +516,7 @@ class OLDC_solver():
                   round( K_angle_rates*np.sum(C_roll_rate + C_yaw_rate*0 + C_steer_rate)/len_rates, 5), '(angles rates)',
                   round(K_effort*np.sum(C_effort)/len_effort, 5), '(torques)',
                   round(K_speed*np.sum(C_speed)/len_speed, 5), '(speed)',
-                  round(K_regu*np.sum(C_regu)/len_regu, 5), '(regulation)')
+                  round(K_regu*np.sum(C_regu)/len_regu, 5), '(regularization)')
 
 
             return self.model.interval*J/10000
@@ -712,7 +698,7 @@ class OLDC_solver():
         
         
 
-        N_std = 4
+        N_std = 6
 
 
 
@@ -1275,14 +1261,12 @@ if False:
                              'high_cut_freq' : 5}
               }
     
-    
-    from scipy.interpolate import CubicSpline
-    
+        
     for run in Runs:
         
         ## Define a fisrt model with full steering and litte points
         
-        model_1 = OLDC_model(PATH, run, config)
+        model_1 = OLBC_model(PATH, run, config)
         treadmill_speed = model_1.treadmill_speed
         
         #Specific lines of code to compute the speed of the bike on the treadmill
@@ -1294,7 +1278,7 @@ if False:
         model_1.df_exp['speed'] = (treadmill_speed + x_dot)*np.cos(psi) - y_dot*np.sin(psi)
         model_1.initialize_model()
         
-        problem_1 = OLDC_solver(model_1, 1)
+        problem_1 = OLBC_solver(model_1, 1)
         problem_1.solve_and_save()
         previous_solution = problem_1.solution.reshape(model_1.x0_shape)
         problem_1.plot_res_type_1(1, '', 'fig')
@@ -1302,7 +1286,7 @@ if False:
         ## Define a second model with more points
         
         config['N_sampling'] = 1
-        model_2 = OLDC_model(PATH, run, config)
+        model_2 = OLBC_model(PATH, run, config)
         model_2.df_exp['speed'] = (treadmill_speed + x_dot)*np.cos(psi) - y_dot*np.sin(psi)
         model_2.initialize_model()
         
@@ -1312,26 +1296,26 @@ if False:
             x0_i_interpolated = CubicSpline(model_1.x_meas_dict['time'], previous_solution[i, :])
             x0[i, :] = x0_i_interpolated(model_2.x_meas_dict['time'])
         
-        problem_2 = OLDC_solver(model_2, 1, x0.flatten())
+        problem_2 = OLBC_solver(model_2, 1, x0.flatten())
         problem_2.solve_and_save()
         previous_solution = problem_2.solution.reshape(model_2.x0_shape)
         problem_2.plot_res_type_1(1, '', 'fig')
         
         ## Define a new model that include roll control as well
         config['roll_control'] = True
-        model_3 = OLDC_model(PATH, run, config)
+        model_3 = OLBC_model(PATH, run, config)
         model_3.df_exp['speed'] = (treadmill_speed + x_dot)*np.cos(psi) - y_dot*np.sin(psi)
         model_3.initialize_model()
         # model_3.eoms= model_3.eoms*10
             
         x0 = np.zeros(model_3.x0_shape)
         x0[:previous_solution.shape[0], :] = previous_solution
-        problem_3 = OLDC_solver(model_3, 1, x0.flatten(), config)
-        problem_3.problem.add_option('tol' , 10e-8)
-        problem_3.problem.add_option('constr_viol_tol' , 10e-6)
-        problem_3.problem.add_option('acceptable_tol' , 10e-6)
+        problem_3 = OLBC_solver(model_3, 1, x0.flatten(), config)
+        problem_3.problem.add_option('tol' , 10e-9)
+        problem_3.problem.add_option('constr_viol_tol' , 10e-8)
+        problem_3.problem.add_option('acceptable_tol' , 10e-8)
         problem_3.solve_and_save()
-        problem_3.plot_res_type_1(0, '', 'fig')
+        problem_3.plot_res_type_1(1, '', 'fig')
         
         # previous_solution_random = problem_3.solution.reshape(model_3.x0_shape) 
         # sol_list = []
@@ -1339,7 +1323,7 @@ if False:
         # for k in range(1):
         
         #     # previous_solution_random[-len(model_3.r):, :] += 0.1*np.sin(2*3.14*5*problem_3.time_simu + np.random.normal(0,3))
-        #     problem_3 = OLDC_solver(model_3, 1, previous_solution_random.flatten())
+        #     problem_3 = OLBC_solver(model_3, 1, previous_solution_random.flatten())
         #     problem_3.solve_and_save()
         #     problem_3.plot_res_type_1(0, '', 'fig')
         #     sol_list.append(problem_3.info)
@@ -1347,12 +1331,12 @@ if False:
     
     
         # model.initialize_model(null_state_solving=False)
-        # problem = OLDC_solver(model, 1, x0)
+        # problem = OLBC_solver(model, 1, x0)
         # problem.solve_and_save()
     
         # new_initial_solution = problem.solution
         # model.initialize_model()
-        # problem = OLDC_solver(model, 1)
+        # problem = OLBC_solver(model, 1)
         # problem.solve_and_save()
     
     # problem.plot_res_type_1(0, '', 'fig')
@@ -1360,98 +1344,6 @@ if False:
 
 #%% Synthetic data
 
-if True:
-    
-    PATH = 'D:/Users/ronne/Documents/4_side_quest/OpenLoopBalanceControl/data/synthetic/'
-
-    Runs = ['20261009_185243']
-    
-    
-    config = {'roll_control' : False,
-              'K_effort' : 0.001/6,
-              'steer_torque' : True,
-              'N_sampling' : 4,
-              'filtering' : {'use_filtering' : False,
-                             'low_cut_freq' : 0.01,
-                             'high_cut_freq' : 5},
-              'synthetic' : True,
-              'ti':0,
-              'tf':30
-              }
-    
-    
-    from scipy.interpolate import CubicSpline
-    
-    for run in Runs:
-        
-        ## Define a fisrt model with full steering and litte points
-        
-        model_1 = OLDC_model(PATH, run, config)
-        
-        model_1.initialize_model()
-        
-        problem_1 = OLDC_solver(model_1, 1)
-        problem_1.solve_and_save()
-        previous_solution = problem_1.solution.reshape(model_1.x0_shape)
-        problem_1.plot_res_type_1(0, '', 'fig')
-        
-        ## Define a second model with more points
-        if True:
-            config['N_sampling'] = 1
-            model_2 = OLDC_model(PATH, run, config)
-            model_2.initialize_model()
-            
-            x0 = np.zeros(model_2.x0_shape)
-            
-            for i in range(previous_solution.shape[0]):
-                x0_i_interpolated = CubicSpline(model_1.x_meas_dict['time'], previous_solution[i, :])
-                x0[i, :] = x0_i_interpolated(model_2.x_meas_dict['time'])
-            
-            problem_2 = OLDC_solver(model_2, 1, x0.flatten())
-            problem_2.solve_and_save()
-            previous_solution = problem_2.solution.reshape(model_2.x0_shape)
-            problem_2.plot_res_type_1(0, '', 'fig')
-        
-        ## Define a new model that include roll control as well
-        if False:
-            config['roll_control'] = True
-            model_3 = OLDC_model(PATH, run, config)
-            model_3.initialize_model()
-            # model_3.eoms= model_3.eoms*10
-                
-            x0 = np.zeros(model_3.x0_shape)
-            x0[:previous_solution.shape[0], :] = previous_solution
-            problem_3 = OLDC_solver(model_3, 1, x0.flatten(), config)
-            problem_3.problem.add_option('tol' , 10e-8)
-            problem_3.problem.add_option('constr_viol_tol' , 10e-6)
-            problem_3.problem.add_option('acceptable_tol' , 10e-6)
-            problem_3.solve_and_save()
-            problem_3.plot_res_type_1(0, '', 'fig')
-        
-        # previous_solution_random = problem_3.solution.reshape(model_3.x0_shape) 
-        # sol_list = []
-        
-        # for k in range(1):
-        
-        #     # previous_solution_random[-len(model_3.r):, :] += 0.1*np.sin(2*3.14*5*problem_3.time_simu + np.random.normal(0,3))
-        #     problem_3 = OLDC_solver(model_3, 1, previous_solution_random.flatten())
-        #     problem_3.solve_and_save()
-        #     problem_3.plot_res_type_1(0, '', 'fig')
-        #     sol_list.append(problem_3.info)
-    
-    
-    
-        # model.initialize_model(null_state_solving=False)
-        # problem = OLDC_solver(model, 1, x0)
-        # problem.solve_and_save()
-    
-        # new_initial_solution = problem.solution
-        # model.initialize_model()
-        # problem = OLDC_solver(model, 1)
-        # problem.solve_and_save()
-    
-    # problem.plot_res_type_1(0, '', 'fig')
-    # problem.plot_results()
 
 
 

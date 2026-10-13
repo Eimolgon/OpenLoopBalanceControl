@@ -253,10 +253,20 @@ def compute_inputs(x, t):
     Fx = 0.0
     if t > 1.0 and t < 10.0:
         Fy = 50.0*0
-        T7 = T7 + 10.0*np.sin(2*3.14*t*2)*0.1*t + 5.0*np.sin(2*3.14*t*4)*0.1*t + + 2.0*np.sin(2*3.14*t*5)*0.1*t
+        T7 = T7 + 10.0*np.sin(2*3.14*t*2)*0.1*t + 5.0*np.sin(2*3.14*t*4)*0.1*t + 2.5*np.sin(2*3.14*t*6 + 0.1)*0.1*t
     else:
         Fy = 0.0
     Fz = 0.0
+    
+    if t>12.0 and t<12.5:
+        Fy = 0
+        T7 =  T7 + 10
+        
+    if t>15 and t<17:
+        Fy = 0
+        T7 =  T7+ 3
+    
+    
     return np.array([Fx, Fy, Fz, T4, T6, T7])
 
 
@@ -326,7 +336,7 @@ def create_pydy_system(bicycle, system):
     }
 
     fps = 100  # frames per second
-    duration = 30.0  # seconds
+    duration = 30  # seconds
     pydy_sys.times = np.linspace(0.0, duration, num=int(duration*fps))
 
     return pydy_sys
