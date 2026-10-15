@@ -234,3 +234,72 @@ def plot_BA(df1, df2, col1, col2, label1, label2):
     plt.tight_layout()
 
     return ax, diff_mean, diff_std
+
+
+
+def generate_txt(n, bike):
+    """
+    Generate a .txt benchmark file for bike n.
+
+    Path: Synth_bike_n/Parameters/Synth_bike_nBenchmark.txt
+    """
+    key_map = {
+        'lambda': 'lam',
+        'c': 'c',
+        'm_H': 'mH',
+        'x_H': 'xH',
+        'z_H': 'zH',
+        'I_Hxx': 'IHxx',
+        'I_Hzz': 'IHzz',
+        'I_Hxz': 'IHxz',
+        'm_R': 'mR',
+        'r_R': 'rR',
+        'I_Rxx': 'IRxx',
+        'I_Ryy': 'IRyy',
+        'm_F': 'mF',
+        'r_F': 'rF',
+        'I_Fxx': 'IFxx',
+        'I_Fyy': 'IFyy',
+        'm_B': 'mB',
+        'x_B': 'xB',
+        'z_B': 'zB',
+        'I_Bxx': 'IBxx',
+        'I_Bzz': 'IBzz',
+        'I_Bxz': 'IBxz',
+        'w': 'w',
+    }
+
+    fixed_params = {'g': 9.81}
+
+    output_order = [
+        'IBxx', 'IBxz', 'IByy', 'IBzz',
+        'IFxx', 'IFyy',
+        'IHxx', 'IHxz', 'IHyy', 'IHzz',
+        'IRxx', 'IRyy',
+        'c', 'g', 'lam',
+        'mB', 'mF', 'mH', 'mR',
+        'rF', 'rR',
+        'w',
+        'xB', 'xH', 'zB', 'zH',
+    ]
+
+    inv_map = {v: k for k, v in key_map.items()}
+
+    lines = []
+    for tkt_name in output_order:
+        if tkt_name in fixed_params:
+            value = fixed_params[tkt_name]
+        elif tkt_name in inv_map:
+            value = bike.get(inv_map[tkt_name], 0.0)
+        else:
+            value = 0.0
+        lines.append(f"{tkt_name} = {value}+/-0.0")
+
+    # Build path: data/bicycles/Synth_bike_n/Parameters/Synth_bike_nBenchmark.txt
+    folder = f"data/bicycles/Synth_bike_{n}"
+    filepath = os.path.join(folder, "Parameters", f"Synth_bike_{n}Benchmark.txt")
+
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+    with open(filepath, 'w') as f:
+        f.write('\n'.join(lines) + '\n')

@@ -125,7 +125,7 @@ def generate_bicycle_rider_model():
     return bicycle_rider, system
 
 
-def generate_model(model_name, config):
+def generate_model(model_name, config, bike):
     t = me.dynamicsymbols._t
     bicycle = sb.WhippleBicycle(f"{model_name}")
     assert type(bicycle) is WhippleBicycleMoore
@@ -255,7 +255,7 @@ def generate_model(model_name, config):
     # %% Parametrization
 
 
-    bike_params = bp.Bicycle("Browser", pathToData="data")
+    bike_params = bp.Bicycle(f"{bike}", pathToData="data")
     # bike_params.add_rider("Jason", reCalc=True)
 
     constants = bicycle.get_param_values(bike_params)

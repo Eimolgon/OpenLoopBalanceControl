@@ -1,6 +1,5 @@
 import configparser
 import os
-import pickle
 
 from bicycleparameters.models import Meijaard2007WithFeedbackModel
 from bicycleparameters.parameter_dicts import meijaard2007_browser_jason, meijaard2007_browser
@@ -249,8 +248,11 @@ def compute_inputs(x, t):
     """
     T4, T7 = compute_torques_lqr(x, t)
     T4 = T4*0
-    T6 = -1.0*np.sin(2*3.14*t*1) - 0.5*np.sin(2*3.14*t*5) - 1.5
+    T6 = (-1.0*np.sin(2*3.14*t*1) - 0.5*np.sin(2*3.14*t*5))*np.sin(2*3.14*t) - 3
     Fx = 0.0
+    
+    
+    
     if t > 1.0 and t < 10.0:
         Fy = 50.0*0
         T7 = T7 + 10.0*np.sin(2*3.14*t*2)*0.1*t + 5.0*np.sin(2*3.14*t*4)*0.1*t + 2.5*np.sin(2*3.14*t*6 + 0.1)*0.1*t
@@ -287,7 +289,7 @@ def create_pydy_system(bicycle, system):
 
     """
 
-    bike_params = bp.Bicycle("Browser", pathToData=BPDATADIR,
+    bike_params = bp.Bicycle("Browser", pathToData='data',
                              forceRawCalc=True)
     # bike_params.add_rider("Jason", reCalc=True)
     constants_def = bicycle.get_param_values(bike_params)
@@ -304,7 +306,7 @@ def create_pydy_system(bicycle, system):
     q1, q2, q3, q4, q6, q7, q8, q5 = system.q
     u4, u6, u7, u1, u2, u3, u5, u8 = system.u
 
-    initial_speed = 3.0  # m/s
+    initial_speed = 2.0  # m/s
     initial_roll_rate = 0.5  # rad/s
 
     pydy_sys.initial_conditions = {
@@ -387,7 +389,7 @@ if __name__ == "__main__":
     pydy_sys = create_pydy_system(bicycle, sys)
     pydy_sys.initial_conditions
     pydy_sys.constants
-    K = compute_controller_gains(meijaard2007_browser, 1.0)
+    # K = compute_controller_gains(meijaard2007_browser, 1.0)
     traj = pydy_sys.integrate()
     input_traj = eval_input_trajectories(pydy_sys.times, traj)
     plot_trajectories(pydy_sys, traj)

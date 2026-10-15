@@ -127,7 +127,7 @@ class OLBC_model():
         else:
              self.list_trials = list_trials
 
-    def initialize_model(self, null_state_solving=False):
+    def initialize_model(self, bike, null_state_solving=False):
         
         
         # not use this line for general use
@@ -140,7 +140,7 @@ class OLBC_model():
 
         self.NUM_NODES = NUM_NODES
 
-        t, x, r, eoms, p, bicycle = generate_model('model', self.config)
+        t, x, r, eoms, p, bicycle = generate_model('model', self.config, bike)
 
         self.x = x
         self.eoms = eoms
@@ -419,12 +419,12 @@ class OLBC_solver():
 
     #Open Loop Direct Collocation Solver
 
-    def __init__(self, model, scaling_factor, x0=None, config=None):
+    def __init__(self, model, x0=None, config=None):
             
-        K_angles = 10*2*8*2
+        K_angles = 10*2*8*5
         K_angle_rates = 10*2*8*10
         K_effort = 0.1
-        K_regu = 0.05
+        K_regu = 0.1
         K_speed = 200*30
 
         
@@ -441,16 +441,8 @@ class OLBC_solver():
         self.NUM_NODES = NUM_NODES
         self.model = model
 
-        State_var_names = [
-            'yaw_angle_q3',
-            'roll_angle_q4',
-            'steer_angle_q7',
-            'roll_rate_u4',
-            'yaw_rate_u3',
-            'steer_rate_u7']
 
-        for var in State_var_names:
-            self.model.x_meas_dict[var] = self.model.x_meas_dict[var]/scaling_factor
+
 
 
         def obj(prob, free):
@@ -823,16 +815,16 @@ class OLBC_solver():
         self.time_simu = np.linspace(0, self.model.DURATION, num = self.model.NUM_NODES)
 
 
-
-        if not os.path.exists(f"results/{self.model.date}_part_{self.model.n_part}_trial_{self.model.n_trial}"):
-            os.makedirs(f"results/{self.model.date}_part_{self.model.n_part}_trial_{self.model.n_trial}")
-
-        try:
-            self.problem.plot_constraint_violations(self.solution)
-        except:
-            plt.savefig(f'results/{self.model.date}_part_{self.model.n_part}_trial_{self.model.n_trial}/constraints_violation.png')
-            plt.close()
-
+        if False:
+            if not os.path.exists(f"results/{self.model.date}_part_{self.model.n_part}_trial_{self.model.n_trial}"):
+                os.makedirs(f"results/{self.model.date}_part_{self.model.n_part}_trial_{self.model.n_trial}")
+    
+            try:
+                self.problem.plot_constraint_violations(self.solution)
+            except:
+                plt.savefig(f'results/{self.model.date}_part_{self.model.n_part}_trial_{self.model.n_trial}/constraints_violation.png')
+                plt.close()
+    
 
 
         #             'metadata' : model.data,
@@ -844,8 +836,9 @@ class OLBC_solver():
                       # 'info' : self.info,
                       'n_part': self.model.n_part,
                       'n_trial': self.model.n_trial,
-                      'time_simu' : self.time_simu,}
-                      # 'problem' : self.problem_to_save}
+                      'time_simu' : self.time_simu,
+                      'problem' : self.problem_to_save,
+                      'config': self.model.config}
 
         # try:
         if not os.path.exists(f"results/{self.model.date}_part_{self.model.n_part}_trial_{self.model.n_trial}"):
@@ -854,17 +847,15 @@ class OLBC_solver():
         dict_saved_file = open(f'results/{self.model.date}_part_{self.model.n_part}_trial_{self.model.n_trial}/{self.model.date}_part_{self.model.n_part}_trial_{self.model.n_trial}.pkl', 'wb')
         pickle.dump(dict_saved, dict_saved_file)
         dict_saved_file.close()
+        
+        results_path = f'results/{self.model.date}_part_{self.model.n_part}_trial_{self.model.n_trial}/{self.model.date}_part_{self.model.n_part}_trial_{self.model.n_trial}.pkl'
 
         # except:
         #     print("Something went wrong when saving dict_saved_file")
 
         print(self.info['status_msg'])
 
-
-        # self.NUM_NODES = NUM_NODES
-
-        # self.data.solution_state()
-        # self.data.solution_input()
+        return(results_path)
 
     def evaluate_bounds(self):
         
