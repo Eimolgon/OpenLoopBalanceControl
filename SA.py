@@ -173,6 +173,15 @@ if __name__ == "__main__":
          0.0904114316323, 0.152391250767, 2.02, 0.34352982332, 0.0883826870796,
          0.149221207336, 9.86, 0.275951285677, -0.537842424305, 0.52962890621,
          0.756786895402, -0.116285607878, 1.121]
+    
+    names = ['lambda', 'c', 'm_H', 'x_H', 'z_H', 
+             'm_R', 'r_R', 'I_Rxx', 'I_Ryy', 'm_F', 'r_F', 'I_Fxx', 'I_Fyy',
+             'm_B' 'w']
+
+    param = [0.399680398707, 0.0685808540382, 3.22, 0.866949640247, -0.748236400835,
+         3.11, 0.340958858855, 0.0904114316323, 0.152391250767, 2.02, 0.34352982332, 0.0883826870796,0.149221207336, 
+         9.86, 1.121]
+
 
     bike = dict(zip(names, param))
 
@@ -184,14 +193,14 @@ if __name__ == "__main__":
     scenario = 'scenario_I'
 
     #%% RUN Morris
-    if True:
+    if False:
         N = 10
         print('Running Morris')
         run_GSA_DOE(fun, problem, bike, N=N, typ='morris',
-                    fname=f'results/SA/morris_{scenario}_n{N}')
+                    fname=f'results/SA/morris_{scenario}_n{N}_10p')
 
     #%% LOAD MORRIS
-    if False:
+    if True:
         plt.close('all')
         N = 10
         MP = MorrisResults(f'results/SA/morris_{scenario}_n{N}', -1)

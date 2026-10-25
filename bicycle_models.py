@@ -225,6 +225,11 @@ def generate_model(model_name, config, bike):
         r = r.col_join(sm.Matrix([roll_moment, rider_saddle_force_y, rider_saddle_force_z]))
 
 
+    if config['F_y'] == True :
+        rider_saddle_force_y = me.dynamicsymbols("F_y")
+        system.add_loads(me.Force(bicycle.rear_frame.saddle.point, rider_saddle_force_y*bicycle.rear_frame.saddle.frame.y))
+        r = r.col_join(sm.Matrix([rider_saddle_force_y]))
+
 
 
     # Before forming the EoMs we need to specify which generalized coordinates
@@ -262,6 +267,19 @@ def generate_model(model_name, config, bike):
     constants[g] = 9.81  # Don't forget to specify the gravitational constant.
 
     constants[m_rider] = 80
+    
+
+
+    constants.update({
+        bicycle.rear_frame.symbols["d4"]: 0.2,
+        bicycle.rear_frame.symbols["d5"]: 0.65
+
+    })
+
+
+
+
+
 
     # print("\n\nConstants of the model:")
     # print(constants)

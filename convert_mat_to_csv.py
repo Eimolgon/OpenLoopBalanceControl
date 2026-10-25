@@ -132,7 +132,7 @@ for filepath in mat_files:
 
     # Export as a tab-delimited CSV, matching the layout of the reference file.
     out_path = os.path.join(OUTPUT_FOLDER, filename.replace('.mat', '.csv'))
-    df.to_csv(out_path, sep='\t', index=True, index_label='')
+    df.to_csv(out_path, sep=';', index=True, index_label='')
     print(f"  [saved] {out_path} ({len(df)} rows, {len(ordered_cols)} columns)")
 
 print(f"\nDone. {len(mat_files)} files processed -> {OUTPUT_FOLDER}")

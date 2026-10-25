@@ -27,7 +27,7 @@ from sympy import Symbol
 
 #New module to import a bicycle model
 from bicycle_models import generate_model
-from utils import animate_solution, butter_bandpass_filter, butter_lowpass_filter, RMSE
+from utils import animate_solution, butter_bandpass_filter, butter_lowpass_filter, RMSE, apply_lag
 from scipy.interpolate import CubicSpline
 
 
@@ -85,7 +85,8 @@ class OLBC_model():
 
         #if data are from MOCAP    
         
-        if config['synthetic'] != True:
+        if config['validation_data'] == 'MOCAP':
+            
 
             self.n_trial = str(run)
             self.df_exp = pd.read_csv(exp_file_path + f'states_{run}.csv')
@@ -98,12 +99,21 @@ class OLBC_model():
         
         # id data are form synthetic
         
-        if config['synthetic'] == True:
+        if config['validation_data'] == 'synthetic':
             
             self.df_exp = pd.read_csv(exp_file_path + f'{run}/' + 'states_and_torques.csv')
             self.n_part = 1
             self.n_trial = str(run)
-
+            
+            
+        if config['validation_data'] == 'CAST':
+            
+            self.n_part = 1
+            self.n_trial = str(run)
+            self.df_exp = pd.read_csv(exp_file_path + f'{run}.csv', sep=";")
+            
+            
+        
         
         
         
@@ -133,7 +143,10 @@ class OLBC_model():
         # not use this line for general use
         ti = self.config['ti']
         tf = self.config['tf']
+        
+        
         df_trial = self.df_exp[(self.df_exp['time']>ti) & (self.df_exp['time']<tf)]
+        N_points_in_trial = len(df_trial)
         time = df_trial['time'].to_numpy()[::self.N_sampling]
         
         NUM_NODES = len(time)
@@ -149,6 +162,9 @@ class OLBC_model():
         self.t = t
         self.bicycle = bicycle
         self.x0_shape = (len(self.x) + len(self.r), self.NUM_NODES)
+        
+        # print(self.x0_shape)
+        # print(me.find_dynamicsymbols(eoms))
         
         
         # df_trial = self.df_exp[self.df_exp['trial'] == n_trial]
@@ -194,10 +210,13 @@ class OLBC_model():
 
         else:
 
-            q1 = df_trial['x'].to_numpy()[::self.N_sampling]
-            q2 = df_trial['y'].to_numpy()[::self.N_sampling]
+            if 'x' in df_trial.columns.to_numpy() and 'y' in df_trial.columns.to_numpy():
+                q1 = df_trial['x'].to_numpy()[::self.N_sampling]
+                q2 = df_trial['y'].to_numpy()[::self.N_sampling]
+            else:
+                q1 = np.zeros(N_points_in_trial)[::self.N_sampling]
+                q2 = np.zeros(N_points_in_trial)[::self.N_sampling]
 
-            
 
             psi = df_trial['yaw angle'].to_numpy()[::self.N_sampling]
             phi = df_trial['roll angle'].to_numpy()[::self.N_sampling]
@@ -211,18 +230,46 @@ class OLBC_model():
             
             wheel_rate = -df_trial['speed'].to_numpy()[::self.N_sampling]/wheel_radius
             
-            Fx = df_trial['seat force Fx'].to_numpy()[::self.N_sampling]
-            Fy = df_trial['seat force Fy'].to_numpy()[::self.N_sampling]
-            Fz = df_trial['seat force Fz'].to_numpy()[::self.N_sampling]
+            if 'seat force Fx' in df_trial.columns.to_numpy():
+                Fx = df_trial['seat force Fx'].to_numpy()[::self.N_sampling]
+            else:
+                Fx = np.zeros(N_points_in_trial)[::self.N_sampling]
+                
+            if 'seat force Fy' in df_trial.columns.to_numpy():
+                Fy = df_trial['seat force Fy'].to_numpy()[::self.N_sampling]
             
-            T4 = df_trial['roll torque T4'].to_numpy()[::self.N_sampling]
-            T6 = df_trial['pedal torque T6'].to_numpy()[::self.N_sampling]
-            T7 = df_trial['steer torque T7'].to_numpy()[::self.N_sampling]
+            if 'seat force Fz' in df_trial.columns.to_numpy():
+                Fz = df_trial['seat force Fz'].to_numpy()[::self.N_sampling]
+            else:
+                Fz = np.zeros(N_points_in_trial)[::self.N_sampling]
+                
+            if 'roll torque T4' in df_trial.columns.to_numpy():
+                T4 = df_trial['roll torque T4'].to_numpy()[::self.N_sampling]
+            else:
+                T4 = np.zeros(N_points_in_trial)[::self.N_sampling]
+            
+            if 'pedal torque T6' in df_trial.columns.to_numpy():
+                T6 = df_trial['pedal torque T6'].to_numpy()[::self.N_sampling]
+            else:
+                T6 = np.zeros(N_points_in_trial)[::self.N_sampling]
+
+            
+            if 'steer torque T7' in df_trial.columns.to_numpy():
+                T7 = df_trial['steer torque T7'].to_numpy()[::self.N_sampling]
+                
+                if 'offset_T7' in self.config['filtering'].keys():
+                    T7 = T7 - self.config['filtering']['offset_T7']
+                    
+                if 'lag_T7' in self.config['filtering'].keys():
+
+                    lag_samples = int(round((self.config['filtering']['lag_T7']+0.04) * fs/self.N_sampling))
+
+                    T7 = apply_lag(T7, lag_samples)
 
 
 
-            phi_ddot = np.gradient(phi_dot, time)
-            delta_ddot = np.gradient(delta_dot, time)
+            # phi_ddot = np.gradient(phi_dot, time)
+            # delta_ddot = np.gradient(delta_dot, time)
 
             # theta_dot = np.gradient(theta, time)
 
@@ -230,7 +277,7 @@ class OLBC_model():
 
             if self.config['filtering']['use_filtering'] == True:
 
-                lowcut = self.config['filtering']['low_cut_freq']
+                # lowcut = self.config['filtering']['low_cut_freq']
                 highcut = self.config['filtering']['high_cut_freq']
 
                 # psi = butter_bandpass_filter(psi, lowcut, highcut, fs_adjusted, order=4)
@@ -245,10 +292,14 @@ class OLBC_model():
 
                 # theta= butter_bandpass_filter(theta, lowcut, highcut, fs_adjusted, order=4)
                 u = butter_lowpass_filter(u, highcut, fs_adjusted, order=4)
+                
+                wheel_rate = butter_lowpass_filter(wheel_rate, highcut, fs_adjusted, order=4)
 
                 psi_dot = butter_lowpass_filter(psi_dot, highcut, fs_adjusted, order=4)
                 phi_dot = butter_lowpass_filter(phi_dot, highcut, fs_adjusted, order=4)
                 delta_dot = butter_lowpass_filter(delta_dot, highcut, fs_adjusted, order=4)
+                
+                T7 = butter_lowpass_filter(T7, highcut, fs_adjusted, order=4)
                 # theta_dot= butter_bandpass_filter(theta_dot, lowcut, highcut, fs_adjusted, order=4)
 
             x_meas_dict  = {'time' : time,
@@ -264,8 +315,8 @@ class OLBC_model():
                             # 'pitch_rate_u5' :     theta_dot,
                             'steer_rate_u7' :     delta_dot,
                             'wheel_rate' :    wheel_rate,
-                            'roll_acc' :        phi_ddot,
-                            'steer_acc' :       delta_ddot,
+                            # 'roll_acc' :        phi_ddot,
+                            # 'steer_acc' :       delta_ddot,
                             'seat_force_Fx': Fx,
                             'seat_force_Fy': Fy,
                             'seat_force_Fz': Fz,
@@ -421,18 +472,18 @@ class OLBC_solver():
 
     def __init__(self, model, x0=None, config=None):
             
-        K_angles = 10*2*8*5
-        K_angle_rates = 10*2*8*10
-        K_effort = 0.1
-        K_regu = 0.1
-        K_speed = 200*30
+        # K_angles = 10*2*8*5
+        # K_angle_rates = 10*2*8*10
+        # K_effort = 0.1
+        # K_regu = 0.1
+        # K_speed = 200*30
 
         
         if config != None:
            
            K_angles = config['K_angles'] 
-           K_angle_rates = config['K_angle_rates'] 
-           K_effort = config['K_effort'] 
+           K_angles_rates = config['K_angles_rates'] 
+           K_efforts = config['K_efforts'] 
            K_regu = config['K_regu'] 
            K_speed = config['K_speed']
         
@@ -440,7 +491,6 @@ class OLBC_solver():
         NUM_NODES = model.NUM_NODES
         self.NUM_NODES = NUM_NODES
         self.model = model
-
 
 
 
@@ -496,17 +546,26 @@ class OLBC_solver():
                 + np.diff(d['F_z'])**2/self.model.interval**2
                 
                 len_regu = len_regu + len_regu*3
+                
+            if self.model.config['F_y'] == True:
+                C_effort = C_effort + d['F_y']**2
+                len_effort = len_effort + len(C_effort)
+                
+                C_regu = C_regu 
+                + np.diff(d['F_y'])**2/self.model.interval**2
+                
+                len_regu = len_regu + len_regu
 
 
 
             J = (K_angles*np.sum(C_yaw*0 + C_roll + C_steer)/len_angles
             + K_speed*np.sum(C_speed)/len_speed
-            + K_angle_rates*np.sum(C_roll_rate + C_yaw_rate*0 + C_steer_rate )/len_rates) + K_effort*np.sum(C_effort)/len_effort
+            + K_angles_rates*np.sum(C_roll_rate + C_yaw_rate*0 + C_steer_rate )/len_rates) + K_efforts*np.sum(C_effort)/len_effort
             + K_regu*np.sum(C_regu)/len_regu
 
             print('J=', round(K_angles*np.sum(C_yaw*0 + C_roll + C_steer)/len_angles, 5),('(angles)+'),
-                  round( K_angle_rates*np.sum(C_roll_rate + C_yaw_rate*0 + C_steer_rate)/len_rates, 5), '(angles rates)',
-                  round(K_effort*np.sum(C_effort)/len_effort, 5), '(torques)',
+                  round( K_angles_rates*np.sum(C_roll_rate + C_yaw_rate*0 + C_steer_rate)/len_rates, 5), '(angles rates)',
+                  round(K_efforts*np.sum(C_effort)/len_effort, 5), '(torques)',
                   round(K_speed*np.sum(C_speed)/len_speed, 5), '(speed)',
                   round(K_regu*np.sum(C_regu)/len_regu, 5), '(regularization)')
 
@@ -547,9 +606,9 @@ class OLBC_solver():
             grad[6*NUM_NODES:7*NUM_NODES] = 2.0*self.model.interval*K_angles*(d['model_q7'] - self.model.x_meas_dict['steer_angle_q7'])/len_angles
             # grad[4*NUM_NODES:5*NUM_NODES] = 2.0*model.interval*K_angles*(d['model_q5'] - model.x_meas_dict['pitch_angle_q5'])
 
-            grad[10*NUM_NODES:11*NUM_NODES] = 0*2.0*self.model.interval*K_angle_rates*(d['model_u3'] - self.model.x_meas_dict['yaw_rate_u3'])/len_rates
-            grad[11*NUM_NODES:12*NUM_NODES] = 2.0*self.model.interval*K_angle_rates*(d['model_u4'] - self.model.x_meas_dict['roll_rate_u4'])/len_rates
-            grad[14*NUM_NODES:15*NUM_NODES] = 2.0*self.model.interval*K_angle_rates*(d['model_u7'] - self.model.x_meas_dict['steer_rate_u7'])/len_rates
+            grad[10*NUM_NODES:11*NUM_NODES] = 0*2.0*self.model.interval*K_angles_rates*(d['model_u3'] - self.model.x_meas_dict['yaw_rate_u3'])/len_rates
+            grad[11*NUM_NODES:12*NUM_NODES] = 2.0*self.model.interval*K_angles_rates*(d['model_u4'] - self.model.x_meas_dict['roll_rate_u4'])/len_rates
+            grad[14*NUM_NODES:15*NUM_NODES] = 2.0*self.model.interval*K_angles_rates*(d['model_u7'] - self.model.x_meas_dict['steer_rate_u7'])/len_rates
             # grad[12*NUM_NODES:13*NUM_NODES] = 2.0*model.interval*K_angles*(d['model_u5'] - model.x_meas_dict['pitch_rate_u5'])
 
             grad[13*NUM_NODES:14*NUM_NODES] = 2.0*self.model.interval*K_speed*(d['model_u6'] - self.model.x_meas_dict['wheel_rate'])/len_speed
@@ -561,7 +620,7 @@ class OLBC_solver():
             reg_term_ped[1:] = reg_grad_ped
 
 
-            grad[16*NUM_NODES:17*NUM_NODES] = 2.0*self.model.interval*K_effort*d['pedaling_torque']/len_effort
+            grad[16*NUM_NODES:17*NUM_NODES] = 2.0*self.model.interval*K_efforts*d['pedaling_torque']/len_effort
             + self.model.interval*reg_term_ped
 
 
@@ -573,7 +632,7 @@ class OLBC_solver():
                 reg_term_steer[:-1] = -reg_grad_steer
                 reg_term_steer[1:] = reg_grad_steer
                 
-                grad[17*NUM_NODES:18*NUM_NODES] = 2.0*self.model.interval*K_effort*d['steer_torque']/len_effort
+                grad[17*NUM_NODES:18*NUM_NODES] = 2.0*self.model.interval*K_efforts*d['steer_torque']/len_effort
                 + self.model.interval*reg_term_steer
 
 
@@ -595,14 +654,26 @@ class OLBC_solver():
                 reg_term_F_z[:-1] = -reg_grad_F_z
                 reg_term_F_z[1:] = reg_grad_F_z
                 
-                grad[18*NUM_NODES:19*NUM_NODES] = 2.0*self.model.interval*K_effort*d['M_x']/len_effort
+                grad[18*NUM_NODES:19*NUM_NODES] = 2.0*self.model.interval*K_efforts*d['M_x']/len_effort
                 + self.model.interval*reg_term_M_x
                 
-                grad[19*NUM_NODES:20*NUM_NODES] = 2.0*self.model.interval*K_effort*d['F_y']/len_effort
+                grad[19*NUM_NODES:20*NUM_NODES] = 2.0*self.model.interval*K_efforts*d['F_y']/len_effort
                 + self.model.interval*reg_term_F_y
                 
-                grad[20*NUM_NODES:21*NUM_NODES] = 2.0*self.model.interval*K_effort*d['F_z']/len_effort
+                grad[20*NUM_NODES:21*NUM_NODES] = 2.0*self.model.interval*K_efforts*d['F_z']/len_effort
                 + self.model.interval*reg_term_F_z
+                
+            if self.model.config['F_y'] == True and self.model.config['roll_control'] == False:
+                len_effort = len_effort + self.NUM_NODES
+                
+                reg_grad_F_y = 2*K_regu*np.diff(d['F_y'])**2/self.model.interval**2/len_reg
+                reg_term_F_y = np.zeros(self.NUM_NODES)
+                reg_term_F_y[:-1] = -reg_grad_F_y
+                reg_term_F_y[1:] = reg_grad_F_y
+                    
+                grad[18*NUM_NODES:19*NUM_NODES] = 2.0*self.model.interval*K_efforts*d['F_y']/len_effort
+                + self.model.interval*reg_term_F_y
+
 
 
             return grad/10000
@@ -617,9 +688,9 @@ class OLBC_solver():
 
         if self.model.config['steer_torque'] == True and self.model.config['roll_control'] == True :
 
-            T_ped, T_steer, M_x, F_y, F_z = model.r
+            T_ped, T_steer, M_x, F_y, F_z = self.model.r
 
-        if self.model.config['steer_torque'] == True and self.model.config['roll_control'] == False :
+        if self.model.config['steer_torque'] == True and self.model.config['roll_control'] == False and self.model.config['F_y'] == False :
 
             # T_steer = self.model.r[0]
             # print(self.model.r)
@@ -630,6 +701,10 @@ class OLBC_solver():
         if self.model.config['steer_torque'] == False and self.model.config['roll_control'] == True :
 
             T_ped, M_x, F_y, F_z = self.model.r
+            
+        if self.model.config['steer_torque'] == True and self.model.config['F_y'] == True and self.model.config['roll_control'] == False :
+
+            T_ped, T_steer, F_y = self.model.r
 
 
 
@@ -717,18 +792,24 @@ class OLBC_solver():
          # u7 : (np.min(self.model.x_meas_dict['steer_rate_u7']), np.max(self.model.x_meas_dict['steer_rate_u7'])),
          u8: (wheel_rate_mean - N_std*wheel_rate_std, 0), #wheel angular rate
 
-         T_ped : (-T_ped_max, 0),
+         T_ped : (-T_ped_max, T_ped_max),
         }
 
 
         if self.model.config['steer_torque'] == True:
-            bounds[T_steer] = (-20, 20)
+            bounds[T_steer] = (-9, 9)
         
     
         if self.model.config['roll_control'] == True:
             bounds[M_x] = (-25, 25)
             bounds[F_y] = (-25, 25)
             bounds[F_z] = (-25, 25)
+            
+            
+        if self.model.config['F_y'] == True:
+
+            bounds[F_y] = (-300, 300)
+
             
         initial_state_constraints = {
             q1 : 0.0,
@@ -784,10 +865,7 @@ class OLBC_solver():
             x0[11,:] = self.model.x_meas_dict['roll_rate_u4']
             
             x0[13,:] = self.model.x_meas_dict['wheel_rate']
-
-            
             x0[14,:] = self.model.x_meas_dict['steer_rate_u7']
-            
             x0[15,:] = self.model.x_meas_dict['wheel_rate']
 
 
@@ -796,7 +874,6 @@ class OLBC_solver():
             
 
         self.initial_guess = x0.flatten()  # u
-
 
         self.problem_to_save = {'eoms' : self.model.eoms,
                                 'x' : self.model.x,
@@ -810,6 +887,7 @@ class OLBC_solver():
 
     def solve_and_save(self):
 
+        
         self.solution, self.info = self.problem.solve(self.initial_guess)
         self.model.solution = self.solution
         self.time_simu = np.linspace(0, self.model.DURATION, num = self.model.NUM_NODES)
@@ -936,13 +1014,12 @@ class OLBC_solver():
         # Trajectories
         axs[0,0].plot(self.solution[0*self.NUM_NODES:(0+1)*self.NUM_NODES], self.solution[1*self.NUM_NODES:(1+1)*self.NUM_NODES], label='path_opt')
         
-        if self.model.config['synthetic'] == True:
-            
-            x = self.model.x_meas_dict['x_q1']
-            y = self.model.x_meas_dict['y_q2']
+
+        x = self.model.x_meas_dict['x_q1']
+        y = self.model.x_meas_dict['y_q2']
 
 
-            axs[0,0].plot(x, y, ls='--', label='path_synth')
+        axs[0,0].plot(x, y, ls='--', label='path_synth')
 
         
         
@@ -1064,15 +1141,19 @@ class OLBC_solver():
         # Longitudinal motion control action
         if True:
             T6_opti = self.solution[16*self.NUM_NODES:(16+1)*self.NUM_NODES]
+            
+            if self.model.config['F_y'] == True:
+                T6_opti = self.solution[17*self.NUM_NODES:(17+1)*self.NUM_NODES]
+            
             axs[2,1].plot(self.time_simu, T6_opti, label = '$T_{pedal}$', color = color[0])
             
-            if self.model.config['synthetic'] == True:
+            # if self.model.config['synthetic'] == True:
                 
-                pedal_torque_T6_synth = self.model.x_meas_dict['pedal_torque_T6']
-                RMSE_T6 = round(RMSE(T6_opti, pedal_torque_T6_synth),3)
-    
-                axs[2,1].plot(self.time_simu, pedal_torque_T6_synth, color = color[0], ls='--', label = '$T6_{ref}$'+f'- RMSE: {RMSE_T6}')
-    
+            pedal_torque_T6_synth = self.model.x_meas_dict['pedal_torque_T6']
+            RMSE_T6 = round(RMSE(T6_opti, pedal_torque_T6_synth),3)
+
+            axs[2,1].plot(self.time_simu, pedal_torque_T6_synth, color = color[0], ls='--', label = '$T6_{ref}$'+f'- RMSE: {RMSE_T6}')
+
     
             axs[2,1].set_xlim(self.time_simu[0], self.time_simu[-1])
             axs[2,1].set_title('Longitudinal motion torques')
@@ -1086,16 +1167,22 @@ class OLBC_solver():
             # TODO: change index if back to T_ped
 
             T7_opti = self.solution[17*self.NUM_NODES:(17+1)*self.NUM_NODES]
+            
+            if self.model.config['F_y'] == True:
+                T7_opti = self.solution[18*self.NUM_NODES:(18+1)*self.NUM_NODES]
+
+            
+            
             axs[1,1].plot(self.time_simu, T7_opti , label = '$T_{7}$', color = color[0])
             # axs[1,1].plot(self.time_simu, self.solution[18*self.NUM_NODES:(18+1)*self.NUM_NODES], label = '$T_{roll}$', color = color[1])
 
-            if self.model.config['synthetic'] == True:
+            # if self.model.config['synthetic'] == True:
                 
                 
-                steer_torque_T7_synth = self.model.x_meas_dict['steer_torque_T7']
-                RMSE_T7 = round(RMSE(T7_opti, steer_torque_T7_synth),3)
+            steer_torque_T7_synth = self.model.x_meas_dict['steer_torque_T7']
+            RMSE_T7 = round(RMSE(T7_opti, steer_torque_T7_synth),3)
 
-                axs[1,1].plot(self.time_simu, steer_torque_T7_synth, label = '$T7_{ref}$'+ f'- RMSE: {RMSE_T7}', color = color[0], ls='--')
+            axs[1,1].plot(self.time_simu, steer_torque_T7_synth, label = '$T7_{ref}$'+ f'- RMSE: {RMSE_T7}', color = color[0], ls='--')
 
 
             axs[1,1].set_xlim(self.time_simu[0], self.time_simu[-1])
@@ -1116,24 +1203,40 @@ class OLBC_solver():
             axs[1,1].plot(self.time_simu, seat_force_Fy_opti, label = '$Fy$', color = color[2])
             axs[1,1].plot(self.time_simu, seat_force_Fz_opti, label = '$Fz$', color = color[3])
             
-            if self.model.config['synthetic'] == True:
+            # if self.model.config['synthetic'] == True:
                 
-                roll_torque_T4_synth = self.model.x_meas_dict['roll_torque_T4']
-                seat_force_Fy_synth = self.model.x_meas_dict['seat_force_Fy']
-                seat_force_Fz_synth = self.model.x_meas_dict['seat_force_Fz']
-                
-                RMSE_T4 = round(RMSE(roll_torque_T4_opti, roll_torque_T4_synth),3)
-                RMSE_Fy = round(RMSE(seat_force_Fy_opti, seat_force_Fy_synth),3)
-                RMSE_Fz = round(RMSE(seat_force_Fz_opti, seat_force_Fz_synth),3)
+            roll_torque_T4_synth = self.model.x_meas_dict['roll_torque_T4']
+            seat_force_Fy_synth = self.model.x_meas_dict['seat_force_Fy']
+            seat_force_Fz_synth = self.model.x_meas_dict['seat_force_Fz']
+            
+            RMSE_T4 = round(RMSE(roll_torque_T4_opti, roll_torque_T4_synth),3)
+            RMSE_Fy = round(RMSE(seat_force_Fy_opti, seat_force_Fy_synth),3)
+            RMSE_Fz = round(RMSE(seat_force_Fz_opti, seat_force_Fz_synth),3)
 
 
 
-                axs[1,1].plot(self.time_simu, roll_torque_T4_synth, label = '$T4_{ref}$'+ f'- RMSE: {RMSE_T4}', color = color[1], ls='--')
-                axs[1,1].plot(self.time_simu, seat_force_Fy_synth, label = '$Fy_{ref}$'+  f'- RMSE: {RMSE_Fy}', color = color[2], ls='--')
-                axs[1,1].plot(self.time_simu, seat_force_Fz_synth, label = '$Fz_{ref}$'+  f'- RMSE: {RMSE_Fz}', color = color[3], ls='--')
-                
-                
+            axs[1,1].plot(self.time_simu, roll_torque_T4_synth, label = '$T4_{ref}$'+ f'- RMSE: {RMSE_T4}', color = color[1], ls='--')
+            axs[1,1].plot(self.time_simu, seat_force_Fy_synth, label = '$Fy_{ref}$'+  f'- RMSE: {RMSE_Fy}', color = color[2], ls='--')
+            axs[1,1].plot(self.time_simu, seat_force_Fz_synth, label = '$Fz_{ref}$'+  f'- RMSE: {RMSE_Fz}', color = color[3], ls='--')
+            
+            
 
+            axs[1,1].set_xlim(self.time_simu[0], self.time_simu[-1])
+            axs[1,1].set_title('Balance control torques')
+            axs[1,1].set_xlabel('time [s]')
+            axs[1,1].set_ylabel('Torque [Nm]')
+            axs[1,1].legend(bbox_to_anchor=(1.01, 1.05))
+            
+            
+        if self.model.config['F_y'] == True:
+
+            seat_force_Fy_opti = self.solution[16*self.NUM_NODES:(16+1)*self.NUM_NODES]
+            axs[1,1].plot(self.time_simu, seat_force_Fy_opti, label = '$Fy$', color = color[2])   
+            seat_force_Fy_synth = self.model.x_meas_dict['seat_force_Fy']
+            RMSE_Fy = round(RMSE(seat_force_Fy_opti, seat_force_Fy_synth),3)
+            axs[1,1].plot(self.time_simu, seat_force_Fy_synth, label = '$Fy_{ref}$'+  f'- RMSE: {RMSE_Fy}', color = color[2], ls='--')
+            
+            
             axs[1,1].set_xlim(self.time_simu[0], self.time_simu[-1])
             axs[1,1].set_title('Balance control torques')
             axs[1,1].set_xlabel('time [s]')
@@ -1149,62 +1252,7 @@ class OLBC_solver():
         if save == 1:
             plt.savefig(f'{path}/{figname}'+'_1_2'+'.svg')
             plt.savefig(f'{path}/{figname}'+'_1_2'+'.png')
-            plt.close()
-
-
-        # fig2, axs2 = plt.subplots(3, 2, figsize=(6*3, 8*3), sharex=True)
-
-        # Acc_x_H_opti = self.solution[18*self.NUM_NODES:(18+1)*self.NUM_NODES]
-        # Acc_x_H_exp = self.x_meas_dict['Acc_x_H']
-        # RMSE_Acc_x_H = round(RMSE(Acc_x_H_opti, Acc_x_H_exp), 3)
-        # axs2[0, 0].plot(self.time_simu, Acc_x_H_opti, color = color[0] ,label = '$Acc_x$'+f'- RMSE: {RMSE_Acc_x_H}')
-        # axs2[0, 0].plot(self.time_simu, Acc_x_H_exp, ls = '--',label = '$Accx_{meas}$', color = color[0])
-
-        # Acc_y_H_opti = self.solution[19*self.NUM_NODES:(19+1)*self.NUM_NODES]
-        # Acc_y_H_exp = self.x_meas_dict['Acc_y_H']
-        # RMSE_Acc_y_H = round(RMSE(Acc_y_H_opti, Acc_y_H_exp), 3)
-        # axs2[1, 0].plot(self.time_simu, Acc_y_H_opti, color = color[0] ,label = '$Acc_y$'+f'- RMSE: {RMSE_Acc_y_H}')
-        # axs2[1, 0].plot(self.time_simu, Acc_y_H_exp, ls = '--',label = '$Accy_{meas}$', color = color[0])
-
-        # Acc_z_H_opti = self.solution[20*self.NUM_NODES:(20+1)*self.NUM_NODES]
-        # Acc_z_H_exp = self.x_meas_dict['Acc_z_H']
-        # RMSE_Acc_z_H = round(RMSE(Acc_z_H_opti, Acc_z_H_exp), 3)
-        # axs2[2, 0].plot(self.time_simu, Acc_z_H_opti, color = color[0] ,label = '$Acc_z$'+f'- RMSE: {RMSE_Acc_z_H}')
-        # axs2[2, 0].plot(self.time_simu, Acc_z_H_exp, ls = '--',label = '$Accz_{meas}$', color = color[0])
-
-
-        # Gyr_x_H_opti = np.rad2deg(self.solution[21*self.NUM_NODES:(21+1)*self.NUM_NODES])
-        # Gyr_x_H_exp = np.rad2deg(self.x_meas_dict['Gyr_x_H'])
-        # RMSE_Gyr_x_H = round(RMSE(Gyr_x_H_opti, Gyr_x_H_exp), 3)
-        # axs2[0, 1].plot(self.time_simu, Gyr_x_H_opti, color = color[0] ,label = '$Gyr_x$'+f'- RMSE: {RMSE_Gyr_x_H}')
-        # axs2[0, 1].plot(self.time_simu, Gyr_x_H_exp, ls = '--',label = '$Gyrx_{meas}$', color = color[0])
-
-        # Gyr_y_H_opti = np.rad2deg(self.solution[22*self.NUM_NODES:(22+1)*self.NUM_NODES])
-        # Gyr_y_H_exp = np.rad2deg(self.x_meas_dict['Gyr_y_H'])
-        # RMSE_Gyr_y_H = round(RMSE(Gyr_y_H_opti, Gyr_y_H_exp), 3)
-        # axs2[1, 1].plot(self.time_simu, Gyr_y_H_opti, color = color[0] ,label = '$Gyr_y$'+f'- RMSE: {RMSE_Gyr_y_H}')
-        # axs2[1, 1].plot(self.time_simu, Gyr_y_H_exp, ls = '--',label = '$Gyry_{meas}$', color = color[0])
-
-        # Gyr_z_H_opti = np.rad2deg(self.solution[23*self.NUM_NODES:(23+1)*self.NUM_NODES])
-        # Gyr_z_H_exp = np.rad2deg(self.x_meas_dict['Gyr_z_H'])
-        # RMSE_Gyr_z_H = round(RMSE(Gyr_z_H_opti, Gyr_z_H_exp), 3)
-        # axs2[2, 1].plot(self.time_simu, Gyr_z_H_opti, color = color[0] ,label = '$Gyr_z$'+f'- RMSE: {RMSE_Gyr_z_H}')
-        # axs2[2, 1].plot(self.time_simu, Gyr_z_H_exp, ls = '--',label = '$Gyrz_{meas}$', color = color[0])
-        # plt.tight_layout()
-
-        # axs2[0,0].legend(bbox_to_anchor=(1.01, 1.05))
-        # axs2[1,0].legend(bbox_to_anchor=(1.01, 1.05))
-        # axs2[2,0].legend(bbox_to_anchor=(1.01, 1.05))
-        # axs2[0,1].legend(bbox_to_anchor=(1.01, 1.05))
-        # axs2[1,1].legend(bbox_to_anchor=(1.01, 1.05))
-        # axs2[2,1].legend(bbox_to_anchor=(1.01, 1.05))
-
-
-
-        if save == 1:
-            plt.savefig(f'{path}/{figname}'+'_2_2'+'.svg')
-            plt.savefig(f'{path}/{figname}'+'_2_2'+'.png')
-            plt.close()
+            # plt.close()
 
 
     def plot_results(self, ani=False):
@@ -1332,12 +1380,3 @@ if False:
     
     # problem.plot_res_type_1(0, '', 'fig')
     # problem.plot_results()
-
-#%% Synthetic data
-
-
-
-
-
-
-

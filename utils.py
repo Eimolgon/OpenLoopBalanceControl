@@ -17,7 +17,7 @@ from IPython.display import HTML
 from matplotlib.animation import FuncAnimation, HTMLWriter, PillowWriter, FFMpegWriter
 
 
-
+from scipy import signal
 from symbrim.utilities.plotting import Plotter
 from scipy.signal import butter, filtfilt
 
@@ -111,6 +111,53 @@ def butter_lowpass_filter(data, highcut, fs, order=4):
     return filtfilt(b, a, data)
 
 
+def NRMSE_and_RMSE(df_opt, df_meas, sig_opt, sig_meas, ti, tf, N_sampling):
+    """
+    Computes RMSE to assess optimization performance
+
+    Parameters
+    ----------
+    x : numpy array
+        ground truth.
+    x_meas : numpy array
+        signal.
+
+    Returns
+    -------
+    RMSE
+
+    """
+    x_meas = df_meas.loc[(df_meas['time']>ti) & (df_meas['time']<tf), sig_meas]
+    x_meas = x_meas[::N_sampling].to_numpy()
+    x_opt = df_opt[sig_opt].to_numpy()
+    
+    std_exp = np.std(x_meas)
+    std_opt = np.std(x_opt)
+    
+    mean_exp = np.mean(x_meas)
+    mean_opt = np.mean(x_opt)
+
+
+    
+    diff = x_meas - x_opt
+    res = np.mean((diff)**2)
+    rmse = np.sqrt(res)
+    nrmse = rmse/std_exp
+    
+
+    correlation = signal.correlate((x_meas-mean_exp)/std_exp, (x_opt-mean_opt)/std_opt, mode="full")/min(len(x_meas),len(x_opt))
+    plt.plot(correlation)
+    R2_max = np.max(correlation)**2
+    lags = signal.correlation_lags(x_meas.size, x_opt.size, mode="full")
+    fs = 1/np.mean(np.diff(df_meas['time'][::N_sampling]))
+    lag = lags[np.argmax(correlation)]/fs
+    
+    
+
+
+    return(rmse, nrmse, R2_max, lag)
+
+
 
 def RMSE(x, x_meas):
     """
@@ -129,10 +176,13 @@ def RMSE(x, x_meas):
 
     """
 
-    res = np.mean((x_meas - x)**2)
-    res = np.sqrt(res)
 
-    return(res)
+    
+    diff = x_meas - x
+    res = np.mean((diff)**2)
+    rmse = np.sqrt(res)
+
+    return(rmse)
 
 import matplotlib as mpl
 
@@ -303,3 +353,35 @@ def generate_txt(n, bike):
 
     with open(filepath, 'w') as f:
         f.write('\n'.join(lines) + '\n')
+        
+        
+def apply_lag(x, lag_samples, fill=0):
+    """
+    Shift a signal by `lag_samples` samples.
+    
+    Parameters
+    ----------
+    x : array-like
+        Signal to shift.
+    lag_samples : int
+        Shift in samples.
+        Positive : signal delayed (shifted to the right).
+        Negative : signal advanced (shifted to the left).
+    fill : float
+        Fill value at the edges (default: NaN).
+    
+    Returns
+    -------
+    np.ndarray
+    """
+    x = np.asarray(x, dtype=float)
+    out = np.full_like(x, fill)
+    
+    if lag_samples > 0:
+        out[lag_samples:] = x[:-lag_samples]
+    elif lag_samples < 0:
+        out[:lag_samples] = x[-lag_samples:]
+    else:
+        out[:] = x
+    
+    return out
