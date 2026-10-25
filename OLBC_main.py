@@ -222,6 +222,15 @@ class OLBC_model():
             phi = df_trial['roll angle'].to_numpy()[::self.N_sampling]
             delta = df_trial['steer angle'].to_numpy()[::self.N_sampling]
             # theta = df_trial['pitch angle'].to_numpy()[::self.N_sampling]
+            
+            if 'yaw rate' not in df_trial.columns:
+                df_trial['yaw rate'] = np.gradient(df_trial['yaw angle'].to_numpy(), df_trial['time'].to_numpy())
+                
+            if 'roll rate' not in df_trial.columns:
+                df_trial['roll rate'] = np.gradient(df_trial['roll angle'].to_numpy(), df_trial['time'].to_numpy())
+                    
+            if 'steer rate' not in df_trial.columns:
+                df_trial['steer rate'] = np.gradient(df_trial['steer angle'].to_numpy(), df_trial['time'].to_numpy())
 
 
             psi_dot = df_trial['yaw rate'].to_numpy()[::self.N_sampling]
@@ -237,6 +246,8 @@ class OLBC_model():
                 
             if 'seat force Fy' in df_trial.columns.to_numpy():
                 Fy = df_trial['seat force Fy'].to_numpy()[::self.N_sampling]
+            else:
+                Fy = np.zeros(N_points_in_trial)[::self.N_sampling]
             
             if 'seat force Fz' in df_trial.columns.to_numpy():
                 Fz = df_trial['seat force Fz'].to_numpy()[::self.N_sampling]
@@ -299,7 +310,9 @@ class OLBC_model():
                 phi_dot = butter_lowpass_filter(phi_dot, highcut, fs_adjusted, order=4)
                 delta_dot = butter_lowpass_filter(delta_dot, highcut, fs_adjusted, order=4)
                 
-                T7 = butter_lowpass_filter(T7, highcut, fs_adjusted, order=4)
+                if 'steer torque T7' in df_trial.columns:
+                    
+                    T7 = butter_lowpass_filter(T7, highcut, fs_adjusted, order=4)
                 # theta_dot= butter_bandpass_filter(theta_dot, lowcut, highcut, fs_adjusted, order=4)
 
             x_meas_dict  = {'time' : time,
@@ -321,12 +334,13 @@ class OLBC_model():
                             'seat_force_Fy': Fy,
                             'seat_force_Fz': Fz,
                             'roll_torque_T4': T4,
-                            'pedal_torque_T6': T6,
-                            'steer_torque_T7': T7,
-
-
-                           } #Include here the signals used to feed the opti
-
+                            } #Include here the signals used to feed the opti
+            
+        if 'steer torque T7' in df_trial.columns:
+            x_meas_dict['steer_torque_T7'] = T7
+            
+        if 'pedal torque T6' in df_trial.columns:
+            x_meas_dict['pedal_torque_T6'] = T6
 
         self.x_meas_dict = x_meas_dict
 
@@ -1281,7 +1295,7 @@ class OLBC_solver():
 #%% From MOCAP
 # PATH = 'C:/Users/ronne/Documents/Recherche/OpenLoopBalanceControl/data/mocap/csv/'
 
-if False:
+if True:
     
     PATH = 'D:/Users/ronne/Documents/4_side_quest/OpenLoopBalanceControl/data/Moore_mocap/csv/'
     # run = '2050'
@@ -1297,7 +1311,12 @@ if False:
               'N_sampling' : 4,
               'filtering' : {'use_filtering' : True,
                              'low_cut_freq' : 0.01,
-                             'high_cut_freq' : 5}
+                             'high_cut_freq' : 5},
+              'validation_data' : 'MOCAP',
+              'bike' : "Browser",
+              'ti':0,
+              'tf': 3,
+              'F_y' : False,
               }
     
         
@@ -1315,7 +1334,7 @@ if False:
         psi = model_1.df_exp['yaw angle']
         
         model_1.df_exp['speed'] = (treadmill_speed + x_dot)*np.cos(psi) - y_dot*np.sin(psi)
-        model_1.initialize_model()
+        model_1.initialize_model(config['bike'])
         
         problem_1 = OLBC_solver(model_1, 1)
         problem_1.solve_and_save()
