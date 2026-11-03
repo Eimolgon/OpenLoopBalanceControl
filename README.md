@@ -2,7 +2,7 @@
 Code and Data to perform trajectories optimization from bicycle (+rider) motion and get the control troques of the rider.
 
 ## Context and Objectives
-- The torque based cyclist balance strategy is poorly describe in the litrature, need for observation, quantification and description
+- The torque based cyclist balance strategy is poorly describe in the literature, need for observation, quantification and description
 - The link between cyclist control actions and workload is still unknown, gaze based workload metrics and balance performance metrics can be used as workload proxy
 
 ## Aim of this code
@@ -79,13 +79,17 @@ conda activate openloopbalancecontrol
 
 ### Basics 
 - the main functions and class are in the ```OLBC_main.py``` file.
-- you must have a csv file with your experimental measurments in folder located in root/data/your_folder
-- columns of the csv file must be the state variables of that bicycle across time, each line is a timestamp 
+- you must have a csv file with your experimental measurements in folder located in root/data/your_experiment
+- in root/data/your_experiment you need a folder per trial, in each folder add your csv file untitled 'states_and_torques.csv'. 
+- columns of the csv file must be the state variables (in rads, m, rad/s) of that bicycle across time, each line is a timestamp 
 - Use q1,q2,q3,...,q8,u1,...,u8 as columns names following Moore PhD dissertation model
-- You can add "speed" as a column for the bicycle speed
-- q4 and q7 are mandatory, add also u4 and u7 if you have them
+- Add "speed" as a column for the bicycle speed
+- q4, q7 and speed are mandatory, add also u4 and u7 if you have them
 - Add a time vector as 'time' in a column
 - you need bicycle parameters in the root/data/bicycles/my_bike folder using BicycleParamaters library
+- the objective function tracks q4,q7,u4,u7,u6 to fit a Non linear CW model to the data. You get torques that reproduce the motion.
+- torques are not validated yet but at least your motion fits at best to a bicycle motion from a model
+
   
 ### Make a config dict
 
