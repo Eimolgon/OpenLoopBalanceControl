@@ -113,13 +113,22 @@ config = {
                       }
   ```
 
-                        model_1 = OLBC_model(path_scenario, scenario_name, config)
-    
-    model_1.initialize_model(config['bike'])
-    
-    problem_1 = OLBC_solver(model_1, config=config)
-    
-    problem_1.solve_and_save()
+                       
+### Use ```OLBC_model``` and ```OLBC_solver``` class
+```
+model = OLBC_model(path_scenario, scenario_name, config)
+model.initialize_model(config['bike'])   
+problem = OLBC_solver(model, config=config) 
+problem.solve_and_save()
+```
+
+- path_scenario is a path to the folder where you have your csv file
+- scenario_name is the name of the csv file
+- config is the dict you just defined
+
+- once a model is declared give it to a OLBC_solver as first argument
+- you can run ```problem.solve_and_save()```
+
 
 
 
