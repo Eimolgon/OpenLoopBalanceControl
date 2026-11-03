@@ -86,8 +86,7 @@ class OLBC_model():
         #if data are from MOCAP    
         
         if config['validation_data'] == 'MOCAP':
-            
-
+        
             self.n_trial = str(run)
             self.df_exp = pd.read_csv(exp_file_path + f'states_{run}.csv')
             # self.list_hands_off_trials = self.df_exp[self.df_exp['condition'] == 'straight/hands_off']['trial'].unique()
@@ -111,20 +110,14 @@ class OLBC_model():
             self.n_part = 1
             self.n_trial = str(run)
             self.df_exp = pd.read_csv(exp_file_path + f'{run}.csv', sep=";")
+            # self.df_exp = pd.read_csv(exp_file_path + f'{run}.csv', sep=",")
             
-            
-        
-        
-        
         
         self.config = config
 
         #Extract config parameters
 
         self.N_sampling = config['N_sampling']
-
-
-
 
         # print("Trials numbers for straight/hands_off condition", self.list_hands_off_trials)
 
@@ -145,6 +138,13 @@ class OLBC_model():
         tf = self.config['tf']
         
         
+        print("\n--- CSV DEBUG ---")
+        print("Columns:", self.df_exp.columns.tolist())
+        print("First rows:")
+        print(self.df_exp.head())
+        print("Shape:", self.df_exp.shape)
+        print("-----------------\n")
+
         df_trial = self.df_exp[(self.df_exp['time']>ti) & (self.df_exp['time']<tf)]
         N_points_in_trial = len(df_trial)
         time = df_trial['time'].to_numpy()[::self.N_sampling]
@@ -1295,7 +1295,7 @@ class OLBC_solver():
 #%% From MOCAP
 # PATH = 'C:/Users/ronne/Documents/Recherche/OpenLoopBalanceControl/data/mocap/csv/'
 
-if True:
+if __name__ == "__main__":
     
     PATH = 'D:/Users/ronne/Documents/4_side_quest/OpenLoopBalanceControl/data/Moore_mocap/csv/'
     # run = '2050'
