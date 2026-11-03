@@ -8,8 +8,8 @@ from OLBC_main import OLBC_model, OLBC_solver
 # INPUT DATA
 # --------------------------------------------------
 
-DATA_DIR = Path("~/Documents/PhD-Project/03-data-output/gopro_test_1_1")
-CSV_NAME = "julesFiltered_gopro_test_1_1"
+DATA_DIR = Path("~/Documents/PhD-Project/03-data-output/gopro_test_1_1").expanduser()
+CSV_NAME = "states_jf_gopro_test_1_1"
 
 # The loader expects DATA_DIR + CSV_NAME + ".csv"
 # and uses semicolon-separated CSV files.
@@ -70,14 +70,14 @@ config = {
     'roll_control' : False, #Experimental, not recommanded so far
     'steer_torque' : True, #Use steer control to control the bike
     'N_sampling' : 1,
-    'validation_data': False,
+    'validation_data': 'CAST',
     'filtering' : {'use_filtering' : True, #You can filter your data with a low pass filter
                 'low_cut_freq' : 0.01, #Not use so far
                 'high_cut_freq' : 5,}, #Tune this one if needed
     'ti': 0.0, # You can select the initial time
     'tf': 10.0, # You can select the final time
     'bike' : 'Benchmark', # Name of the bicycle paramaters you use in the BicyclePAramaters library
-    'F_y' : False, # Recommanded so far 
+    'Fy' : False, # Recommended so far 
     }
 
 

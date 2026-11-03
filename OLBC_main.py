@@ -108,8 +108,8 @@ class OLBC_model():
             
             self.n_part = 1
             self.n_trial = str(run)
-            self.df_exp = pd.read_csv(exp_file_path + f'{run}.csv', sep=";")
-            # self.df_exp = pd.read_csv(exp_file_path + f'{run}.csv', sep=",")
+            # self.df_exp = pd.read_csv(exp_file_path + f'{run}.csv', sep=";")
+            self.df_exp = pd.read_csv(exp_file_path + f'{run}.csv')
             
         
         self.config = config
@@ -136,13 +136,6 @@ class OLBC_model():
         ti = self.config['ti']
         tf = self.config['tf']
         
-        
-        print("\n--- CSV DEBUG ---")
-        print("Columns:", self.df_exp.columns.tolist())
-        print("First rows:")
-        print(self.df_exp.head())
-        print("Shape:", self.df_exp.shape)
-        print("-----------------\n")
 
         df_trial = self.df_exp[(self.df_exp['time']>ti) & (self.df_exp['time']<tf)]
         N_points_in_trial = len(df_trial)
@@ -409,15 +402,15 @@ class OLBC_model():
         ## Angles
 
         #Yaw angle
-        psi_exp = np.rad2deg(model.x_meas_dict['q3'])
+        psi_exp = np.rad2deg(self.x_meas_dict['q3'])
         axs[1,0].plot(time, psi_exp, ls = '--',label = '$\\psi_{meas}$', color = color[0])
 
         #Roll angle
-        phi_exp = np.rad2deg(model.x_meas_dict['q4'])
+        phi_exp = np.rad2deg(self.x_meas_dict['q4'])
         axs[1,0].plot(time, phi_exp, ls = '--',label = '$\\phi_{meas}$', color = color[1])
 
         #Steer angle
-        delta_exp = np.rad2deg(model.x_meas_dict['q7'])
+        delta_exp = np.rad2deg(self.x_meas_dict['q7'])
         axs[1,0].plot(time, delta_exp, ls = '--',label = '$\\delta_{meas}$', color = color[2])
 
         # Lean angle: theta
@@ -435,20 +428,20 @@ class OLBC_model():
         ## Angle Rates
 
         #Yaw angle rate
-        psi_dot_exp = np.rad2deg(model.x_meas_dict['u3'])
+        psi_dot_exp = np.rad2deg(self.x_meas_dict['u3'])
         axs[2,0].plot(time, psi_dot_exp, ls = '--',label = '$\\dot{\\psi_{meas}}$', color = color[0])
 
         #Roll angle rate
-        phi_dot_exp = np.rad2deg(model.x_meas_dict['u4'])
+        phi_dot_exp = np.rad2deg(self.x_meas_dict['u4'])
         axs[2,0].plot(time, phi_dot_exp, ls = '--',label = '$\\dot{\\phi_{meas}}$', color = color[1])
 
         #Steer angle rate
-        delta_dot_exp = np.rad2deg(model.x_meas_dict['u7'])
+        delta_dot_exp = np.rad2deg(self.x_meas_dict['u7'])
         axs[2,0].plot(time, delta_dot_exp, ls = '--',label = '$\\dot{\\delta_{meas}}$', color = color[2])
 
         # Pitch angle: theta
-        theta_dot_exp = np.rad2deg(model.x_meas_dict['u5'])
-        axs[2,0].plot(time, theta_dot_exp, ls = '--', label = '$\\dot{\\theta_{meas}}$', color = color[3])
+        # theta_dot_exp = np.rad2deg(self.x_meas_dict['u5'])
+        # axs[2,0].plot(time, theta_dot_exp, ls = '--', label = '$\\dot{\\theta_{meas}}$', color = color[3])
 
 
         axs[2,0].set_xlim(time[0], time[-1])
@@ -1164,10 +1157,10 @@ class OLBC_solver():
             
             # if self.model.config['synthetic'] == True:
                 
-            pedal_torque_T6_synth = self.model.x_meas_dict['T6']
-            RMSE_T6 = round(RMSE(T6_opti, pedal_torque_T6_synth),3)
+            # pedal_torque_T6_synth = self.model.x_meas_dict['T6']
+            # RMSE_T6 = round(RMSE(T6_opti, pedal_torque_T6_synth),3)
 
-            axs[2,1].plot(self.time_simu, pedal_torque_T6_synth, color = color[0], ls='--', label = '$T6_{ref}$'+f'- RMSE: {RMSE_T6}')
+            # axs[2,1].plot(self.time_simu, pedal_torque_T6_synth, color = color[0], ls='--', label = '$T6_{ref}$'+f'- RMSE: {RMSE_T6}')
 
     
             axs[2,1].set_xlim(self.time_simu[0], self.time_simu[-1])
@@ -1193,10 +1186,10 @@ class OLBC_solver():
             # if self.model.config['synthetic'] == True:
                 
                 
-            steer_torque_T7_synth = self.model.x_meas_dict['T7']
-            RMSE_T7 = round(RMSE(T7_opti, steer_torque_T7_synth),3)
+            # steer_torque_T7_synth = self.model.x_meas_dict['T7']
+            # RMSE_T7 = round(RMSE(T7_opti, steer_torque_T7_synth),3)
 
-            axs[1,1].plot(self.time_simu, steer_torque_T7_synth, label = '$T7_{ref}$'+ f'- RMSE: {RMSE_T7}', color = color[0], ls='--')
+            # axs[1,1].plot(self.time_simu, steer_torque_T7_synth, label = '$T7_{ref}$'+ f'- RMSE: {RMSE_T7}', color = color[0], ls='--')
 
 
             axs[1,1].set_xlim(self.time_simu[0], self.time_simu[-1])
