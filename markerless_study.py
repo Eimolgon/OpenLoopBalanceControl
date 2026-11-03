@@ -116,7 +116,11 @@ if True:
     
     path_scenario = 'D:/Users/ronne/Documents/4_side_quest/OpenLoopBalanceControl/data/markerless/'
 
-    
+    # Benja you need a folder named 'states_kf_gopro_test_1_1' at 'path_scenario'
+    # Then rename the csv file "states_and_torques.csv'
+    # Add a time vector 
+    # Convert to rads
+    # Try to run !
     scenario_name = 'states_kf_gopro_test_1_1'
 
     path_to_results = run_in_2_folds(scenario_name, config)
