@@ -120,6 +120,7 @@ if True:
     # Then rename the csv file "states_and_torques.csv'
     # Add a time vector 
     # Convert to rads
+    # remane columns using q1,...,q8, u1 to u8 + 'speed' that is u6*R_r
     # Try to run !
     scenario_name = 'states_kf_gopro_test_1_1'
 
