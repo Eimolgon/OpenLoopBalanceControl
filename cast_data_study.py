@@ -82,7 +82,7 @@ def run_in_2_folds(scenario_name, config):
 
 # TODO: find the optimal gains
 
-if False:
+if True:
 
     scenario_name = '00190'
     df = pd.read_csv(path_scenario + scenario_name + '.csv', sep=';')
@@ -140,7 +140,7 @@ if False:
 if True:
     
     list_runs = ['00184','00185','00186','00190','00191','00192','00248','00249','00250','00251','00252','00253','00255','00256','00257']
-    list_runs = ['00184', '00185','00186','00190']
+    list_runs = ['00184']
     
     cutting_times = [[(0,4), (5,10), (11.5, 16), (18, 24), (25.5, 30.5), (32, 37), (39, 43), (45, 50), (52, 57)],
                         [(0,6), (13,24), (28, 32), (18, 24), (35, 44), (47, 53), (55, 59)],
