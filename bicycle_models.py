@@ -94,7 +94,7 @@ def generate_bicycle_rider_model():
     )
 
     # Force applied to the saddle, expressed in the rear frame unit vectors.
-    Fx, Fy, Fz = me.dynamicsymbols('F_x, F_y, F_z')
+    Fx, Fy, Fz = me.dynamicsymbols('Fx, Fy, Fz')
     system.add_loads(me.Force(
         bicycle.rear_frame.saddle.point,
         Fx*bicycle.rear_frame.saddle.frame.x +
@@ -156,7 +156,7 @@ def generate_model(model_name, config, bike):
     m_rider = sm.symbols('m_rider')
     # system.add_loads(me.Force(bicycle.rear_frame.saddle.point, -g*m_rider*normal))
 
-    pedaling_torque = me.dynamicsymbols("pedaling_torque")
+    pedaling_torque = me.dynamicsymbols("T6")
     system.add_actuators(
         me.TorqueActuator(
             pedaling_torque,
@@ -185,7 +185,7 @@ def generate_model(model_name, config, bike):
     if config['steer_torque'] == True :
 
         # Steer torque
-        steer_torque = me.dynamicsymbols("steer_torque")
+        steer_torque = me.dynamicsymbols("T7")
         system.add_actuators(
             me.TorqueActuator(
                 steer_torque,
@@ -199,7 +199,7 @@ def generate_model(model_name, config, bike):
 
     if config['roll_control'] == True :
 
-        roll_moment = me.dynamicsymbols("M_x")
+        roll_moment = me.dynamicsymbols("Mx")
         
         
         yaw_frame = me.ReferenceFrame('yaw_frame')
@@ -216,8 +216,8 @@ def generate_model(model_name, config, bike):
         )
 
 
-        rider_saddle_force_y = me.dynamicsymbols("F_y")
-        rider_saddle_force_z = me.dynamicsymbols("F_z")
+        rider_saddle_force_y = me.dynamicsymbols("Fy")
+        rider_saddle_force_z = me.dynamicsymbols("Fz")
         system.add_loads(me.Force(bicycle.rear_frame.saddle.point, rider_saddle_force_y*bicycle.rear_frame.saddle.frame.y))
         system.add_loads(me.Force(bicycle.rear_frame.saddle.point, rider_saddle_force_z*bicycle.rear_frame.saddle.frame.z))
 
@@ -225,8 +225,8 @@ def generate_model(model_name, config, bike):
         r = r.col_join(sm.Matrix([roll_moment, rider_saddle_force_y, rider_saddle_force_z]))
 
 
-    if config['F_y'] == True :
-        rider_saddle_force_y = me.dynamicsymbols("F_y")
+    if config['Fy'] == True :
+        rider_saddle_force_y = me.dynamicsymbols("Fy")
         system.add_loads(me.Force(bicycle.rear_frame.saddle.point, rider_saddle_force_y*bicycle.rear_frame.saddle.frame.y))
         r = r.col_join(sm.Matrix([rider_saddle_force_y]))
 
