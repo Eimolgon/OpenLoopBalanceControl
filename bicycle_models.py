@@ -264,19 +264,36 @@ def generate_model(model_name, config, bike):
     # bike_params.add_rider("Jason", reCalc=True)
 
     constants = bicycle.get_param_values(bike_params)
+
     constants[g] = 9.81  # Don't forget to specify the gravitational constant.
 
     constants[m_rider] = 80
     
 
+    # Commented following chatgpt ideas
+    # constants.update({
+    #     bicycle.rear_frame.symbols["d4"]: 0.2,
+    #     bicycle.rear_frame.symbols["d5"]: 0.65
+
+    # })
 
     constants.update({
         bicycle.rear_frame.symbols["d4"]: 0.2,
-        bicycle.rear_frame.symbols["d5"]: 0.65
+        bicycle.rear_frame.symbols["d5"]: 0.65,
 
+        # Visualization-only geometry (initial approximations)
+        bicycle.rear_frame.symbols["l_bbx"]: 0.35,
+        bicycle.rear_frame.symbols["l_bbz"]: -0.30,
+
+        bicycle.front_frame.symbols["d6"]: 0.05,
+        bicycle.front_frame.symbols["d7"]: 0.20,
+        bicycle.front_frame.symbols["d8"]: 0.10,
     })
 
-
+    missing = bicycle.get_all_symbols().difference(constants.keys())
+    print("\n--- Missing bicycle parameters ---")
+    for symbol in sorted(missing, key=str):
+        print(symbol)
 
 
 

@@ -1284,6 +1284,20 @@ class OLBC_solver():
             x_opt = sol_reshaped[:len(self.model.x),:].T
             r_opt = sol_reshaped[len(self.model.x):,:].T
 
+            # print("\n--- ANIMATION PARAMETERS ---")
+            # print("Parameter count:", len(self.model.p))
+            # for key, value in self.model.p.items():
+            #     print(repr(key), "=", value)
+            # print("----------------------------")
+
+            print("\n--- MISSING BICYCLE PARAMETERS ---")
+            required = self.model.bicycle.get_all_symbols()
+            provided = set(self.model.p.keys())
+            for symbol in sorted(required, key=str):
+                if symbol not in provided:
+                    print("Missing:", symbol)
+            print("----------------------------------")
+
             animate_solution(self.time_simu, x_opt, r_opt, self.model.bicycle, self.model.x, self.model.r, self.model.p, ani_name)
 
 

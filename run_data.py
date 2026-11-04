@@ -114,6 +114,6 @@ problem = OLBC_solver(
 problem.solve_and_save()
 
 # Plot optimization results
-problem.plot_results()
+problem.plot_results(ani=True)
 
 print("Optimization completed!")
